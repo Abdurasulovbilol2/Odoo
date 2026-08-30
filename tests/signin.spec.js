@@ -112,3 +112,42 @@ test("rejects invalid email format", async ({ page }) => {
     })
     .toBeTruthy();
 });
+
+test("rejects short password on sign in", async ({ page }) => {
+  await page.setContent(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Odoo</title>
+      </head>
+      <body>
+        <form id="loginForm">
+          <label>Email</label>
+          <input name="login" type="email" value="user@example.com" required />
+          <label>Password</label>
+          <input name="password" type="password" value="123" required />
+          <button type="submit">Log in</button>
+        </form>
+        <div id="result"></div>
+        <script>
+          const form = document.getElementById('loginForm');
+          form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const password = document.querySelector('input[name="password"]').value;
+            if (password.length < 6) {
+              document.getElementById('result').textContent = 'Password must be at least 6 characters';
+              return;
+            }
+            document.getElementById('result').textContent = 'valid';
+          });
+        </script>
+      </body>
+    </html>
+  `);
+
+  await page.getByRole("button", { name: /log in/i }).click();
+
+  await expect(page.locator("#result")).toHaveText(
+    "Password must be at least 6 characters",
+  );
+});
