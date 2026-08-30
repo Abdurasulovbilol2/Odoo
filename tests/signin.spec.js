@@ -151,3 +151,41 @@ test("rejects short password on sign in", async ({ page }) => {
     "Password must be at least 6 characters",
   );
 });
+
+test("navigates to forgot password flow", async ({ page }) => {
+  await page.setContent(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Odoo</title>
+      </head>
+      <body>
+        <form id="loginForm">
+          <label>Email</label>
+          <input name="login" type="email" value="" />
+          <label>Password</label>
+          <input name="password" type="password" value="" />
+          <button type="submit">Log in</button>
+          <a href="#/reset-password">Forgot password?</a>
+        </form>
+        <div id="resetContainer" hidden>Reset instructions sent</div>
+        <script>
+          document.querySelector('a[href="#/reset-password"]').addEventListener('click', (event) => {
+            event.preventDefault();
+            document.getElementById('resetContainer').hidden = false;
+          });
+        </script>
+      </body>
+    </html>
+  `);
+
+  const resetLink = page.getByRole("link", { name: /forgot password\?/i });
+  await expect(resetLink).toBeVisible();
+
+  await resetLink.click();
+
+  await expect(page.locator("#resetContainer")).toBeVisible();
+  await expect(page.locator("#resetContainer")).toHaveText(
+    "Reset instructions sent",
+  );
+});
