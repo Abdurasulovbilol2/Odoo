@@ -82,3 +82,33 @@ test("rejects empty sign in submission", async ({ page }) => {
     })
     .toBeTruthy();
 });
+
+test("rejects invalid email format", async ({ page }) => {
+  await page.setContent(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Odoo</title>
+      </head>
+      <body>
+        <form id="loginForm">
+          <label>Email</label>
+          <input name="login" type="email" value="invalid-email" required />
+          <label>Password</label>
+          <input name="password" type="password" value="secret123" required />
+          <button type="submit">Log in</button>
+        </form>
+      </body>
+    </html>
+  `);
+
+  const loginField = page.locator('input[name="login"]').first();
+
+  await page.getByRole("button", { name: /log in/i }).click();
+
+  await expect
+    .poll(async () => {
+      return await loginField.evaluate((el) => el.validity.typeMismatch);
+    })
+    .toBeTruthy();
+});
