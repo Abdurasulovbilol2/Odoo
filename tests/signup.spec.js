@@ -1,37 +1,9 @@
 const { test, expect } = require("@playwright/test");
+const { setupSignupForm, setupNavigationForm } = require("./fixtures");
 
 test("loads the Odoo signup form", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="signupForm">
-          <label>Name</label>
-          <input name="name" type="text" value="" />
-          <label>Email</label>
-          <input name="login" type="email" value="" />
-          <button type="submit">Sign up</button>
-        </form>
-        <div id="result"></div>
-        <script>
-          document.getElementById('signupForm').addEventListener('submit', (event) => {
-            event.preventDefault();
-            const name = document.querySelector('input[name="name"]').value;
-            const email = document.querySelector('input[name="login"]').value;
-            document.getElementById('result').textContent = name + '|' + email;
-          });
-        </script>
-      </body>
-    </html>
-  `);
-
-  const nameField = page.locator('input[name="name"]').first();
-  const emailField = page
-    .locator('input[name="login"], input[type="email"]')
-    .first();
+  const { nameField, emailField, submitButton, resultDiv } =
+    await setupSignupForm(page);
 
   await expect(page).toHaveTitle(/Odoo/i);
   await expect(nameField).toBeVisible({ timeout: 20000 });
@@ -39,34 +11,18 @@ test("loads the Odoo signup form", async ({ page }) => {
 
   await nameField.fill("John Doe");
   await emailField.fill("john@example.com");
-  await page.getByRole("button", { name: /sign up/i }).click();
+  await submitButton.click();
 
-  await expect(page.locator("#result")).toHaveText("John Doe|john@example.com");
+  await expect(resultDiv).toHaveText("John Doe|john@example.com");
 });
 
 test("rejects empty signup submission", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="signupForm">
-          <label>Name</label>
-          <input name="name" type="text" value="" required />
-          <label>Email</label>
-          <input name="login" type="email" value="" required />
-          <button type="submit">Sign up</button>
-        </form>
-      </body>
-    </html>
-  `);
+  const { nameField, emailField, submitButton } = await setupSignupForm(page, {
+    nameRequired: true,
+    emailRequired: true,
+  });
 
-  const nameField = page.locator('input[name="name"]').first();
-  const emailField = page.locator('input[name="login"]').first();
-
-  await page.getByRole("button", { name: /sign up/i }).click();
+  await submitButton.click();
 
   await expect
     .poll(async () => {
@@ -82,27 +38,13 @@ test("rejects empty signup submission", async ({ page }) => {
 });
 
 test("rejects invalid email format on signup", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="signupForm">
-          <label>Name</label>
-          <input name="name" type="text" value="John Doe" required />
-          <label>Email</label>
-          <input name="login" type="email" value="invalid-email" required />
-          <button type="submit">Sign up</button>
-        </form>
-      </body>
-    </html>
-  `);
+  const { emailField, submitButton } = await setupSignupForm(page, {
+    name: "John Doe",
+    email: "invalid-email",
+    emailRequired: true,
+  });
 
-  const emailField = page.locator('input[name="login"]').first();
-
-  await page.getByRole("button", { name: /sign up/i }).click();
+  await submitButton.click();
 
   await expect
     .poll(async () => {
@@ -112,79 +54,26 @@ test("rejects invalid email format on signup", async ({ page }) => {
 });
 
 test("rejects short password on signup", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="signupForm">
-          <label>Name</label>
-          <input name="name" type="text" value="John Doe" required />
-          <label>Email</label>
-          <input name="login" type="email" value="john@example.com" required />
-          <label>Password</label>
-          <input name="password" type="password" value="123" required />
-          <button type="submit">Sign up</button>
-        </form>
-        <div id="result"></div>
-        <script>
-          const form = document.getElementById('signupForm');
-          form.addEventListener('submit', (event) => {
-            event.preventDefault();
-            const password = document.querySelector('input[name="password"]').value;
-            if (password.length < 6) {
-              document.getElementById('result').textContent = 'Password must be at least 6 characters';
-              return;
-            }
-            document.getElementById('result').textContent = 'valid';
-          });
-        </script>
-      </body>
-    </html>
-  `);
+  const { submitButton, resultDiv } = await setupSignupForm(page, {
+    name: "John Doe",
+    email: "john@example.com",
+    password: "123",
+    includePassword: true,
+    passwordRequired: true,
+  });
 
-  await page.getByRole("button", { name: /sign up/i }).click();
+  await submitButton.click();
 
-  await expect(page.locator("#result")).toHaveText(
-    "Password must be at least 6 characters",
-  );
+  await expect(resultDiv).toHaveText("Password must be at least 6 characters");
 });
 
 test("navigates from signup to sign in", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <div id="signupView">
-          <h1>Sign up</h1>
-          <a href="#signin">I already have an account</a>
-        </div>
-        <div id="signinView" hidden>
-          <h1>Sign in</h1>
-        </div>
-        <script>
-          document.querySelector('a[href="#signin"]').addEventListener('click', (event) => {
-            event.preventDefault();
-            document.getElementById('signupView').hidden = true;
-            document.getElementById('signinView').hidden = false;
-          });
-        </script>
-      </body>
-    </html>
-  `);
+  const { signupView, signinView, signInLink } =
+    await setupNavigationForm(page);
 
-  const signInLink = page.getByRole("link", {
-    name: /i already have an account/i,
-  });
   await expect(signInLink).toBeVisible();
-
   await signInLink.click();
 
-  await expect(page.locator("#signinView")).toBeVisible();
-  await expect(page.locator("#signinView")).toHaveText(/Sign in/i);
+  await expect(signinView).toBeVisible();
+  await expect(signinView).toHaveText(/Sign in/i);
 });

@@ -1,78 +1,35 @@
 const { test, expect } = require("@playwright/test");
+const { setupSigninForm, setupForgotPasswordForm } = require("./fixtures");
 
 test("loads the Odoo sign in form", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="loginForm">
-          <label>Email</label>
-          <input name="login" type="email" value="" />
-          <label>Password</label>
-          <input name="password" type="password" value="" />
-          <button type="submit">Log in</button>
-        </form>
-        <div id="result"></div>
-        <script>
-          document.getElementById('loginForm').addEventListener('submit', (event) => {
-            event.preventDefault();
-            const login = document.querySelector('input[name="login"]').value;
-            const password = document.querySelector('input[name="password"]').value;
-            document.getElementById('result').textContent = login + '|' + password;
-          });
-        </script>
-      </body>
-    </html>
-  `);
-
-  const loginField = page
-    .locator('input[name="login"], input[type="email"]')
-    .first();
-  const passwordField = page.locator('input[name="password"]').first();
+  const { emailField, passwordField, submitButton, resultDiv } =
+    await setupSigninForm(page);
 
   await expect(page).toHaveTitle(/Odoo/i);
-  await expect(loginField).toBeVisible({ timeout: 20000 });
+  await expect(emailField).toBeVisible({ timeout: 20000 });
   await expect(passwordField).toBeVisible({ timeout: 20000 });
 
-  await loginField.fill("user@example.com");
+  await emailField.fill("user@example.com");
   await passwordField.fill("secret123");
-  await page.getByRole("button", { name: /log in/i }).click();
+  await submitButton.click();
 
-  await expect(page.locator("#result")).toHaveText(
-    "user@example.com|secret123",
-  );
+  await expect(resultDiv).toHaveText("user@example.com|secret123");
 });
 
 test("rejects empty sign in submission", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="loginForm">
-          <label>Email</label>
-          <input name="login" type="email" value="" required />
-          <label>Password</label>
-          <input name="password" type="password" value="" required />
-          <button type="submit">Log in</button>
-        </form>
-      </body>
-    </html>
-  `);
+  const { emailField, passwordField, submitButton } = await setupSigninForm(
+    page,
+    {
+      emailRequired: true,
+      passwordRequired: true,
+    },
+  );
 
-  const loginField = page.locator('input[name="login"]').first();
-  const passwordField = page.locator('input[name="password"]').first();
-
-  await page.getByRole("button", { name: /log in/i }).click();
+  await submitButton.click();
 
   await expect
     .poll(async () => {
-      return await loginField.evaluate((el) => el.validity.valueMissing);
+      return await emailField.evaluate((el) => el.validity.valueMissing);
     })
     .toBeTruthy();
 
@@ -84,108 +41,39 @@ test("rejects empty sign in submission", async ({ page }) => {
 });
 
 test("rejects invalid email format", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="loginForm">
-          <label>Email</label>
-          <input name="login" type="email" value="invalid-email" required />
-          <label>Password</label>
-          <input name="password" type="password" value="secret123" required />
-          <button type="submit">Log in</button>
-        </form>
-      </body>
-    </html>
-  `);
+  const { emailField, submitButton } = await setupSigninForm(page, {
+    email: "invalid-email",
+    emailRequired: true,
+    password: "secret123",
+  });
 
-  const loginField = page.locator('input[name="login"]').first();
-
-  await page.getByRole("button", { name: /log in/i }).click();
+  await submitButton.click();
 
   await expect
     .poll(async () => {
-      return await loginField.evaluate((el) => el.validity.typeMismatch);
+      return await emailField.evaluate((el) => el.validity.typeMismatch);
     })
     .toBeTruthy();
 });
 
 test("rejects short password on sign in", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="loginForm">
-          <label>Email</label>
-          <input name="login" type="email" value="user@example.com" required />
-          <label>Password</label>
-          <input name="password" type="password" value="123" required />
-          <button type="submit">Log in</button>
-        </form>
-        <div id="result"></div>
-        <script>
-          const form = document.getElementById('loginForm');
-          form.addEventListener('submit', (event) => {
-            event.preventDefault();
-            const password = document.querySelector('input[name="password"]').value;
-            if (password.length < 6) {
-              document.getElementById('result').textContent = 'Password must be at least 6 characters';
-              return;
-            }
-            document.getElementById('result').textContent = 'valid';
-          });
-        </script>
-      </body>
-    </html>
-  `);
+  const { submitButton, resultDiv } = await setupSigninForm(page, {
+    email: "user@example.com",
+    password: "123",
+    passwordRequired: true,
+  });
 
-  await page.getByRole("button", { name: /log in/i }).click();
+  await submitButton.click();
 
-  await expect(page.locator("#result")).toHaveText(
-    "Password must be at least 6 characters",
-  );
+  await expect(resultDiv).toHaveText("Password must be at least 6 characters");
 });
 
 test("navigates to forgot password flow", async ({ page }) => {
-  await page.setContent(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Odoo</title>
-      </head>
-      <body>
-        <form id="loginForm">
-          <label>Email</label>
-          <input name="login" type="email" value="" />
-          <label>Password</label>
-          <input name="password" type="password" value="" />
-          <button type="submit">Log in</button>
-          <a href="#/reset-password">Forgot password?</a>
-        </form>
-        <div id="resetContainer" hidden>Reset instructions sent</div>
-        <script>
-          document.querySelector('a[href="#/reset-password"]').addEventListener('click', (event) => {
-            event.preventDefault();
-            document.getElementById('resetContainer').hidden = false;
-          });
-        </script>
-      </body>
-    </html>
-  `);
+  const { resetLink, resetContainer } = await setupForgotPasswordForm(page);
 
-  const resetLink = page.getByRole("link", { name: /forgot password\?/i });
   await expect(resetLink).toBeVisible();
-
   await resetLink.click();
 
-  await expect(page.locator("#resetContainer")).toBeVisible();
-  await expect(page.locator("#resetContainer")).toHaveText(
-    "Reset instructions sent",
-  );
+  await expect(resetContainer).toBeVisible();
+  await expect(resetContainer).toHaveText("Reset instructions sent");
 });
