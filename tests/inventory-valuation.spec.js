@@ -1,4 +1,4 @@
-const { test, expect } = require("@playwright/test");
+ mconst { test, expect } = require("@playwright/test");
 
 function escapeHtml(value) {
   return String(value ?? "")
