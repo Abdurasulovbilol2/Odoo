@@ -24,6 +24,47 @@ async function setupLotTraceabilityPage(page, options = {}) {
     <html>
       <head>
         <title>Lot Traceability | Odoo</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          form { display: grid; gap: 8px; max-width: 420px; }
+          .date-picker { display: grid; gap: 8px; }
+          #expiryDate { width: 220px; }
+          #calendarPanel {
+            border: 1px solid #d0d5dd;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fff;
+            width: 260px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+          }
+          .calendar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+          }
+          .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+          }
+          .calendar-day {
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            border-radius: 4px;
+            padding: 6px 0;
+            cursor: pointer;
+          }
+          .calendar-day.muted {
+            opacity: 0.4;
+            cursor: default;
+          }
+          .calendar-day.selected {
+            background: #2d7ff9;
+            color: #fff;
+            border-color: #2d7ff9;
+          }
+        </style>
       </head>
       <body>
         <h1>Lot Traceability</h1>
@@ -41,7 +82,18 @@ async function setupLotTraceabilityPage(page, options = {}) {
           <input id="quantity" name="quantity" type="number" step="0.01" value="${safeOptions.quantity || ""}" required />
 
           <label for="expiryDate">Expiry date *</label>
-          <input id="expiryDate" name="expiryDate" type="date" value="${safeOptions.expiryDate || ""}" required />
+          <div class="date-picker">
+            <input id="expiryDate" name="expiryDate" type="text" value="${safeOptions.expiryDate || ""}" placeholder="YYYY-MM-DD" required />
+            <button type="button" id="calendarToggle">Open calendar</button>
+            <div id="calendarPanel" hidden>
+              <div class="calendar-header">
+                <button type="button" id="prevMonth" aria-label="Previous month">&lt;</button>
+                <span id="calendarMonthLabel"></span>
+                <button type="button" id="nextMonth" aria-label="Next month">&gt;</button>
+              </div>
+              <div class="calendar-grid" id="calendarDays"></div>
+            </div>
+          </div>
 
           <label for="status">Status *</label>
           <select id="status" name="status" required>
@@ -57,6 +109,86 @@ async function setupLotTraceabilityPage(page, options = {}) {
         <div id="result" role="status"></div>
 
         <script>
+          const expiryInput = document.getElementById("expiryDate");
+          const calendarPanel = document.getElementById("calendarPanel");
+          const calendarDays = document.getElementById("calendarDays");
+          const monthLabel = document.getElementById("calendarMonthLabel");
+          const toggleButton = document.getElementById("calendarToggle");
+          const prevMonthButton = document.getElementById("prevMonth");
+          const nextMonthButton = document.getElementById("nextMonth");
+
+          let currentViewDate = expiryInput.value ? new Date(expiryInput.value + "T00:00:00") : new Date();
+
+          const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const day = String(date.getDate()).padStart(2, "0");
+            return year + "-" + month + "-" + day;
+          };
+
+          function renderCalendar() {
+            const year = currentViewDate.getFullYear();
+            const month = currentViewDate.getMonth();
+            monthLabel.textContent = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(currentViewDate);
+
+            const firstDayOfMonth = new Date(year, month, 1);
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const offset = (firstDayOfMonth.getDay() + 6) % 7;
+            const previousMonthDays = new Date(year, month, 0).getDate();
+
+            const cells = [];
+            for (let i = 0; i < offset; i++) {
+              const day = previousMonthDays - offset + i + 1;
+              cells.push('<button type="button" class="calendar-day muted" disabled>' + day + '</button>');
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+              const dateValue = formatDate(new Date(year, month, day));
+              const selectedClass = expiryInput.value === dateValue ? "selected" : "";
+              cells.push('<button type="button" class="calendar-day ' + selectedClass + '" data-date="' + dateValue + '">' + day + '</button>');
+            }
+
+            const totalCells = Math.ceil((offset + daysInMonth) / 7) * 7;
+            for (let day = 1; cells.length < totalCells; day++) {
+              cells.push('<button type="button" class="calendar-day muted" disabled>' + day + '</button>');
+            }
+
+            calendarDays.innerHTML = cells.join("");
+
+            calendarDays.querySelectorAll("[data-date]").forEach((button) => {
+              button.addEventListener("click", () => {
+                expiryInput.value = button.dataset.date;
+                currentViewDate = new Date(button.dataset.date + "T00:00:00");
+                calendarPanel.hidden = true;
+                renderCalendar();
+              });
+            });
+          }
+
+          toggleButton.addEventListener("click", () => {
+            calendarPanel.hidden = !calendarPanel.hidden;
+            if (!calendarPanel.hidden) {
+              renderCalendar();
+            }
+          });
+
+          prevMonthButton.addEventListener("click", () => {
+            currentViewDate = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() - 1, 1);
+            renderCalendar();
+          });
+
+          nextMonthButton.addEventListener("click", () => {
+            currentViewDate = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() + 1, 1);
+            renderCalendar();
+          });
+
+          expiryInput.addEventListener("change", () => {
+            if (expiryInput.value) {
+              currentViewDate = new Date(expiryInput.value + "T00:00:00");
+            }
+            renderCalendar();
+          });
+
           document.getElementById("traceabilityForm").addEventListener("submit", (event) => {
             event.preventDefault();
             const lotNumber = document.getElementById("lotNumber").value;
@@ -83,6 +215,8 @@ async function setupLotTraceabilityPage(page, options = {}) {
 
             result.textContent = "Lot saved: " + [lotNumber, product, warehouse, quantity.toFixed(2), expiryDate, status].join(" | ");
           });
+
+          renderCalendar();
         </script>
       </body>
     </html>
