@@ -236,3 +236,30 @@ test("keeps a pre-filled warehouse transfer", async ({ page }) => {
   await expect(result).toContainText("Central Hub");
   await expect(result).toContainText("Transferred");
 });
+
+test("rejects a transfer when source and destination are the same", async ({
+  page,
+}) => {
+  const {
+    productField,
+    sourceLocationField,
+    destinationLocationField,
+    quantityField,
+    transferDateField,
+    statusField,
+    submitButton,
+    result,
+  } = await setupWarehousePage(page);
+
+  await productField.fill("Laser Printer");
+  await sourceLocationField.fill("Warehouse X");
+  await destinationLocationField.fill("Warehouse X");
+  await quantityField.fill("4");
+  await transferDateField.fill("2026-09-21");
+  await statusField.selectOption("Draft");
+  await submitButton.click();
+
+  await expect(result).toHaveText(
+    "Source and destination locations must be different",
+  );
+});
