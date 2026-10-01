@@ -216,6 +216,31 @@ test("rejects invalid capacity values", async ({ page }) => {
   await expect(result).toHaveText("Capacity must be greater than zero");
 });
 
+test("rejects warm temperatures for cold-chain locations", async ({ page }) => {
+  const {
+    locationNameField,
+    zoneField,
+    aisleField,
+    capacityField,
+    temperatureField,
+    statusField,
+    submitButton,
+    result,
+  } = await setupStockLocationsPage(page);
+
+  await locationNameField.fill("Cold Bay 5");
+  await zoneField.selectOption("Cold Chain");
+  await aisleField.fill("C-05");
+  await capacityField.fill("80");
+  await temperatureField.fill("7");
+  await statusField.selectOption("Active");
+  await submitButton.click();
+
+  await expect(result).toHaveText(
+    "Cold chain locations must stay at 5°C or below",
+  );
+});
+
 test("keeps a pre-filled stock location", async ({ page }) => {
   const {
     locationNameField,

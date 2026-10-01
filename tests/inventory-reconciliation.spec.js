@@ -252,6 +252,37 @@ test("rejects negative quantity values", async ({ page }) => {
   await expect(result).toHaveText("Quantity values cannot be negative");
 });
 
+test("requires a meaningful variance for flagged reconciliations", async ({
+  page,
+}) => {
+  const {
+    productField,
+    warehouseField,
+    systemQtyField,
+    physicalQtyField,
+    varianceField,
+    adjustedByField,
+    dateField,
+    statusField,
+    submitButton,
+    result,
+  } = await setupInventoryReconciliationPage(page);
+
+  await productField.fill("Scanner");
+  await warehouseField.fill("North Bay");
+  await systemQtyField.fill("50");
+  await physicalQtyField.fill("52");
+  await varianceField.fill("2");
+  await adjustedByField.fill("L. Chen");
+  await dateField.fill("2026-09-30");
+  await statusField.selectOption("Flagged");
+  await submitButton.click();
+
+  await expect(result).toHaveText(
+    "Flagged reconciliations require at least a 5-unit variance",
+  );
+});
+
 test("keeps a pre-filled reconciliation", async ({ page }) => {
   const {
     productField,

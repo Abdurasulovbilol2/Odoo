@@ -57,9 +57,9 @@ async function setupWarehousePage(page, options = {}) {
         <script>
           document.getElementById("warehouseTransferForm").addEventListener("submit", (event) => {
             event.preventDefault();
-            const product = document.getElementById("product").value;
-            const source = document.getElementById("sourceLocation").value;
-            const destination = document.getElementById("destinationLocation").value;
+            const product = document.getElementById("product").value.trim();
+            const source = document.getElementById("sourceLocation").value.trim();
+            const destination = document.getElementById("destinationLocation").value.trim();
             const quantity = document.getElementById("quantity").value;
             const transferDate = document.getElementById("transferDate").value;
             const status = document.getElementById("status").value;
@@ -67,6 +67,11 @@ async function setupWarehousePage(page, options = {}) {
 
             if (Number(quantity) <= 0) {
               result.textContent = "Quantity must be greater than 0";
+              return;
+            }
+
+            if (source === destination) {
+              result.textContent = "Source and destination locations must be different";
               return;
             }
 
